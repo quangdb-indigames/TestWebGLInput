@@ -9,6 +9,8 @@ namespace WebGLSupport
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
         [DllImport("__Internal")]
+        public static extern void WebGLWindowInit();
+        [DllImport("__Internal")]
         public static extern void WebGLWindowOnFocus(Action cb);
 
         [DllImport("__Internal")]
@@ -19,17 +21,27 @@ namespace WebGLSupport
 
         [DllImport("__Internal")]
         public static extern void WebGLWindowInjectFullscreen();
+
+        [DllImport("__Internal")]
+        public static extern string WebGLWindowGetCanvasName();
 #else
+        public static void WebGLWindowInit() { }
         public static void WebGLWindowOnFocus(Action cb) { }
         public static void WebGLWindowOnBlur(Action cb) { }
         public static void WebGLWindowOnResize(Action cb) { }
         public static void WebGLWindowInjectFullscreen() { }
+        public static string WebGLWindowGetCanvasName() { return ""; }
+
 #endif
 
     }
 
     public static class WebGLWindow
     {
+        static WebGLWindow()
+        {
+            WebGLWindowPlugin.WebGLWindowInit();
+        }
         public static bool Focus { get; private set; }
         public static event Action OnFocusEvent = () => { };
         public static event Action OnBlurEvent = () => { };
@@ -70,5 +82,11 @@ namespace WebGLSupport
         {
             Init();
         }
+
+        public static string GetCanvasName()
+        {
+            return WebGLWindowPlugin.WebGLWindowGetCanvasName();
+        }
+
     }
 }

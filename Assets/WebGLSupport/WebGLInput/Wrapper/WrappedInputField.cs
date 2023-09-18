@@ -93,9 +93,8 @@ namespace WebGLSupport
             input.ActivateInputField();
         }
 
-        public void DeactivateInputField(bool isClearEndEdit)
+        public void DeactivateInputField()
         {
-            if (isClearEndEdit) input.text = string.Empty;
             input.DeactivateInputField();
         }
 

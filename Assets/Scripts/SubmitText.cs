@@ -14,7 +14,7 @@ public class SubmitText : MonoBehaviour
 
     private void Start()
     {
-        _webGLInput.CallbackOnSubmit += OnSubmit;
+        //_webGLInput.CallbackOnSubmit += OnSubmit;
     }
 
     public void OnSubmit()

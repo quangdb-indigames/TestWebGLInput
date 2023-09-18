@@ -39,7 +39,7 @@ namespace WebGLSupport
 
         RectTransform RectTransform();
         void ActivateInputField();
-        void DeactivateInputField(bool isClearEndEdit);
+        void DeactivateInputField();
         void Rebuild();
     }
 }

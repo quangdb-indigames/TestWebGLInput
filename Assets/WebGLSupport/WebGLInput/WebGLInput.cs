@@ -22,7 +22,7 @@ namespace WebGLSupport
         public static extern int WebGLInputCreate(string canvasId, int x, int y, int width, int height, int fontsize, string text, string placeholder, bool isMultiLine, bool isPassword, bool isHidden, bool isMobile);
 
         [DllImport("__Internal")]
-        public static extern void WebGLInputEnterSubmit(int id, bool flag, Action<int> cb);
+        public static extern void WebGLInputEnterSubmit(int id, bool flag);
 
         [DllImport("__Internal")]
         public static extern void WebGLInputTab(int id, Action<int, int> cb);
@@ -76,7 +76,7 @@ namespace WebGLSupport
 #else
         public static void WebGLInputInit() {}
         public static int WebGLInputCreate(string canvasId, int x, int y, int width, int height, int fontsize, string text, string placeholder, bool isMultiLine, bool isPassword, bool isHidden, bool isMobile) { return 0; }
-        public static void WebGLInputEnterSubmit(int id, bool flag, Action<int> cb) { }
+        public static void WebGLInputEnterSubmit(int id, bool flag) { }
         public static void WebGLInputTab(int id, Action<int, int> cb) { }
         public static void WebGLInputFocus(int id) { }
         public static void WebGLInputOnFocus(int id, Action<int> cb) { }
@@ -111,23 +111,13 @@ namespace WebGLSupport
 
         static WebGLInput()
         {
-#if UNITY_2020_1_OR_NEWER
-            WebGLInput.CanvasId = "unity-container";
-#elif UNITY_2019_1_OR_NEWER
-            WebGLInput.CanvasId = "unityContainer";
-#else
-            WebGLInput.CanvasId = "gameContainer";
-#endif
+            CanvasId = WebGLWindow.GetCanvasName();
             WebGLInputPlugin.WebGLInputInit();
         }
         public int Id { get { return id; } }
         internal int id = -1;
         public IInputField input;
         bool blurBlock = false;
-        public bool forceEnable = false;
-        bool IsMobileEnable => Application.isMobilePlatform || forceEnable;
-        public Action CallbackOnSubmit;
-        public bool isClearEndEdit;
 
         [TooltipAttribute("show input element on canvas. this will make you select text by drag.")]
         public bool showHtmlElement = false;
@@ -135,6 +125,9 @@ namespace WebGLSupport
         private IInputField Setup()
         {
             if (GetComponent<InputField>()) return new WrappedInputField(GetComponent<InputField>());
+#if TMP_WEBGL_SUPPORT
+            if (GetComponent<TMPro.TMP_InputField>()) return new WrappedTMPInputField(GetComponent<TMPro.TMP_InputField>());
+#endif // TMP_WEBGL_SUPPORT
             throw new Exception("Can not Setup WebGLInput!!");
         }
 
@@ -146,7 +139,7 @@ namespace WebGLSupport
             enabled = false;
 #endif
             // モバイルの入力対応
-            if (IsMobileEnable)
+            if (Application.isMobilePlatform)
             {
                 gameObject.AddComponent<WebGLInputMobile>();
             }
@@ -160,7 +153,7 @@ namespace WebGLSupport
         {
             var rect = GetScreenCoordinates(input.RectTransform());
             // モバイルの場合、強制表示する
-            if (showHtmlElement || IsMobileEnable)
+            if (showHtmlElement || Application.isMobilePlatform)
             {
                 var x = (int)(rect.x);
                 var y = (int)(Screen.height - (rect.y + rect.height));
@@ -180,19 +173,18 @@ namespace WebGLSupport
         public void OnSelect()
         {
             if (id != -1) throw new Exception("OnSelect : id != -1");
-            Debug.Log($"[WebGL Input] On Select");
+
             var rect = GetElemetRect();
             bool isPassword = input.contentType == ContentType.Password;
 
-            var fontSize = 12; // limit font size : 14 !!
+            var fontSize = Mathf.Max(14, input.fontSize); // limit font size : 14 !!
 
             // モバイルの場合、強制表示する
-            var isHidden = !(showHtmlElement || IsMobileEnable);
-            id = WebGLInputPlugin.WebGLInputCreate(WebGLInput.CanvasId, rect.x, rect.y, rect.width, rect.height, fontSize, input.text, input.placeholder, input.lineType != LineType.SingleLine, isPassword, isHidden, IsMobileEnable);
+            var isHidden = !(showHtmlElement || Application.isMobilePlatform);
+            id = WebGLInputPlugin.WebGLInputCreate(WebGLInput.CanvasId, rect.x, rect.y, rect.width, rect.height, fontSize, input.text, input.placeholder, input.lineType != LineType.SingleLine, isPassword, isHidden, Application.isMobilePlatform);
 
             instances[id] = this;
-            Debug.Log($"[WebGL Input] On Select, create id: {id}");
-            WebGLInputPlugin.WebGLInputEnterSubmit(id, input.lineType != LineType.MultiLineNewline, OnSubmit);
+            WebGLInputPlugin.WebGLInputEnterSubmit(id, input.lineType != LineType.MultiLineNewline);
             WebGLInputPlugin.WebGLInputOnFocus(id, OnFocus);
             WebGLInputPlugin.WebGLInputOnBlur(id, OnBlur);
             WebGLInputPlugin.WebGLInputOnValueChange(id, OnValueChange);
@@ -259,7 +251,7 @@ namespace WebGLSupport
             if (!instances.ContainsKey(id)) return;
 
             WebGLInputPlugin.WebGLInputDelete(id);
-            input.DeactivateInputField(isClearEndEdit);
+            input.DeactivateInputField();
             instances.Remove(id);
             id = -1;    // reset id to -1;
             WebGLWindow.OnBlurEvent -= OnWindowBlur;
@@ -268,19 +260,10 @@ namespace WebGLSupport
         [MonoPInvokeCallback(typeof(Action<int>))]
         static void OnFocus(int id)
         {
-            Debug.Log($"[WebGL Input] On Focus");
 #if UNITY_WEBGL && !UNITY_EDITOR
             Input.ResetInputAxes(); // Inputの状態リセット
             UnityEngine.WebGLInput.captureAllKeyboardInput = false;
 #endif
-        }
-
-        [MonoPInvokeCallback(typeof(Action<int>))]
-        static void OnSubmit(int id)
-        {
-            Debug.Log($"[WebGL Input] On Submit, invoke callback on Submit");
-            instances[id].CallbackOnSubmit?.Invoke();
-            //instances[id].input.text = String.Empty;
         }
 
         [MonoPInvokeCallback(typeof(Action<int>))]
@@ -295,7 +278,6 @@ namespace WebGLSupport
 
         static IEnumerator Blur(int id)
         {
-            Debug.Log($"[WebGL Input] On Blur");
             yield return null;
             if (!instances.ContainsKey(id)) yield break;
 
@@ -308,9 +290,9 @@ namespace WebGLSupport
         [MonoPInvokeCallback(typeof(Action<int, string>))]
         static void OnValueChange(int id, string value)
         {
-            if (!instances.ContainsKey(id)) return;           
+            if (!instances.ContainsKey(id)) return;
+
             var instance = instances[id];
-            Debug.Log($"[WebGL Input] On Value Change, new value: {value} / current value: {instance.input.text}");
             if (!instance.input.ReadOnly)
             {
                 instance.input.text = value;
@@ -332,7 +314,7 @@ namespace WebGLSupport
                 var end = WebGLInputPlugin.WebGLInputSelectionEnd(id);
                 // take the offset.when char remove from input.
                 var offset = instance.input.text.Length - value.Length;
-                Debug.Log($"[WebGL Input] On Value Change, new value different with current vale, start calling WebGLInputText");
+
                 WebGLInputPlugin.WebGLInputText(id, instance.input.text);
                 // reset the input element selection range!!
                 WebGLInputPlugin.WebGLInputSetSelectionRange(id, start + offset, end + offset);
@@ -341,7 +323,6 @@ namespace WebGLSupport
         [MonoPInvokeCallback(typeof(Action<int, string>))]
         static void OnEditEnd(int id, string value)
         {
-            Debug.Log($"[WebGL Input] On Edit End");
             if (!instances[id].input.ReadOnly)
             {
                 instances[id].input.text = value;
@@ -364,7 +345,7 @@ namespace WebGLSupport
             // 未登録の場合、選択する
             if (!instances.ContainsKey(id))
             {
-                if (IsMobileEnable)
+                if (Application.isMobilePlatform)
                 {
                     return;
                 } else
@@ -374,7 +355,7 @@ namespace WebGLSupport
             }
             else if (!WebGLInputPlugin.WebGLInputIsFocus(id))
             {
-                if (IsMobileEnable)
+                if (Application.isMobilePlatform)
                 {
                     //input.DeactivateInputField();
                     return;
@@ -433,11 +414,10 @@ namespace WebGLSupport
 
         public void CheckOutFocus()
         {
-            if (!IsMobileEnable) return;
+            if (!Application.isMobilePlatform) return;
             if (!instances.ContainsKey(id)) return;
             var current = EventSystem.current.currentSelectedGameObject;
             if (current != null) return;
-            Debug.Log($"[WebGL Input] Check Out Focus!");
             WebGLInputPlugin.WebGLInputForceBlur(id);   // Input ではないし、キーボードを閉じる
         }
 

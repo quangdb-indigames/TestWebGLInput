@@ -31,23 +31,15 @@ var WebGLInput = {
 			}
 		}
 
-				var input = document.createElement(isMultiLine?"textarea":"input");
-				input.style.position = "absolute";
+        var input = document.createElement(isMultiLine?"textarea":"input");
+        input.style.position = "absolute";
 
 		if(isMobile) {
-			// NOTE:
-			// Hide the input area.
-			// Input status is secured by the game.
-			// input.style.transform = "scale(0)";
-
-			// Always present on and off screen.
-			// If you want to display the input area, adjust the design here.
-			// input.style.top = -20 + "vh";
-			input.style.bottom = 2 + "vh";
+			input.style.bottom = 1 + "vh";
 			input.style.left = 5 + "vw";
-			input.style.width = 70 + "vw";
-			input.style.height = (isMultiLine? 15 : 8) + "vh";
-			input.style.fontSize = 4 + "vh";
+			input.style.width = 90 + "vw";
+			input.style.height = (isMultiLine? 18 : 10) + "vh";
+			input.style.fontSize = 5 + "vh";
 			input.style.borderWidth = 5 + "px";
 			input.style.borderColor = "#000000";
 		} else {
@@ -80,16 +72,14 @@ var WebGLInput = {
 		}
         return instances.push(input) - 1;
     },
-	WebGLInputEnterSubmit: function(id, flag, cb){
+	WebGLInputEnterSubmit: function(id, falg){
 		var input = instances[id];
 		// for enter key
 		input.addEventListener('keydown', function(e) {
 			if ((e.which && e.which === 13) || (e.keyCode && e.keyCode === 13)) {
-				if(flag)
+				if(falg)
 				{
-					console.log("[WebGL Input#onsubmit] Submit: ", input.value);
 					e.preventDefault();
-					Runtime.dynCall("vi", cb, [id]);
 					input.blur();
 				}
 			}
@@ -140,13 +130,12 @@ var WebGLInput = {
         input.oninput = function () {
 			var intArray = intArrayFromString(input.value);
             var value = (allocate.length <= 2) ? allocate(intArray, ALLOC_NORMAL):allocate(intArray, 'i8', ALLOC_NORMAL);
-						console.log("[WebGL Input#oninput] New value: ", value);
             Runtime.dynCall("vii", cb, [id,value]);
         };
     },
 	WebGLInputOnEditEnd:function(id, cb){
         var input = instances[id];
-        input.onchange = function () {					
+        input.onchange = function () {
 			var intArray = intArrayFromString(input.value);
             var value = (allocate.length <= 2) ? allocate(intArray, ALLOC_NORMAL):allocate(intArray, 'i8', ALLOC_NORMAL);
             Runtime.dynCall("vii", cb, [id,value]);
